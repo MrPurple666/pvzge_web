@@ -29,6 +29,193 @@ window.fetch = function(resource, init) {
   }
 };
 
+// FIX: WebGL Context Configuration for transparent background
+const originalGetContext = HTMLCanvasElement.prototype.getContext;
+HTMLCanvasElement.prototype.getContext = function(contextType, contextAttributes) {
+  if (contextType === 'webgl' || contextType === 'webgl2') {
+    if (!contextAttributes) contextAttributes = {};
+    
+    // Ensure transparency works properly
+    contextAttributes.alpha = true;
+    contextAttributes.premultipliedAlpha = true;
+    contextAttributes.preserveDrawingBuffer = true;
+    contextAttributes.antialias = false; // Disable for performance on mobile
+    contextAttributes.stencil = true; // Enable stencil buffer
+    
+    console.log('[PvZ2] WebGL context configured with alpha and transparency');
+  }
+  return originalGetContext.call(this, contextType, contextAttributes);
+};
+
+// FIX: Force initial WebGL context creation and rendering for Cocos engine
+function initWebGLForCocos() {
+  console.log('[PvZ2] Initializing WebGL fixes for Cocos');
+  
+  // Wait for DOM to be ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupWebGLFix);
+  } else {
+    setupWebGLFix();
+  }
+  
+  function setupWebGLFix() {
+    const canvas = document.querySelector('canvas');
+    if (!canvas) {
+      console.error('[PvZ2] Canvas element not found!');
+      return;
+    }
+    
+    // Set canvas background to transparent initially
+    canvas.style.backgroundColor = 'transparent';
+    
+    // Ensure the canvas is properly sized
+    const resizeCanvas = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+    };
+    
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', resizeCanvas);
+    
+    // Get WebGL context and configure it
+    let context = canvas.getContext('webgl', {
+      alpha: true,
+      premultipliedAlpha: true,
+      preserveDrawingBuffer: true,
+      antialias: false,
+      failIfMajorPerformanceCaveat: false,
+      stencil: true
+    }) || canvas.getContext('experimental-webgl', {
+      alpha: true,
+      premultipliedAlpha: true,
+      preserveDrawingBuffer: true,
+      antialias: false,
+      failIfMajorPerformanceCaveat: false,
+      stencil: true
+    });
+    
+    if (context) {
+      console.log('[PvZ2] WebGL context created successfully');
+      
+      // Set initial clear color to transparent
+      context.clearColor(0.0, 0.0, 0.0, 0.0);
+      context.clear(context.COLOR_BUFFER_BIT | context.DEPTH_BUFFER_BIT);
+      
+      // Patch the Cocos cc.game.run method to ensure WebGL context is properly set up
+      if (window.cc && window.cc.game) {
+        const originalRun = window.cc.game.run;
+        window.cc.game.run = function() {
+          console.log('[PvZ2] Running game with WebGL fixes');
+          
+          // Apply WebGL settings before running
+          if (context) {
+            context.clearColor(0.0, 0.0, 0.0, 0.0);
+            context.enable(context.DEPTH_TEST);
+            context.enable(context.BLEND);
+            context.blendFunc(context.SRC_ALPHA, context.ONE_MINUS_SRC_ALPHA);
+            context.enable(context.STENCIL_TEST);
+          }
+          
+          return originalRun.call(this);
+        };
+      }
+    } else {
+      console.error('[PvZ2] Failed to create WebGL context');
+    }
+  }
+}
+
+// Enhanced fix to ensure proper rendering after Cocos initialization
+function forceRenderFix() {
+  if (window.cc && window.cc.game && window.cc.game._renderContext) {
+    const context = window.cc.game._renderContext;
+    if (context) {
+      context.clearColor(0.0, 0.0, 0.0, 0.0);
+      context.clear(context.COLOR_BUFFER_BIT | context.DEPTH_BUFFER_BIT);
+    }
+  }
+}
+
+// Apply the patches
+initWebGLForCocos();
+
+// Also try to patch after loading the Cocos engine
+window.addEventListener('load', function() {
+  setTimeout(function() {
+    // Force render fix multiple times during initialization
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => {
+        if (window.cc && window.cc.game) {
+          const canvas = document.querySelector('canvas');
+          if (canvas) {
+            const context = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (context) {
+              // Apply additional WebGL fixes after engine initialization
+              context.clearColor(0.0, 0.0, 0.0, 0.0);
+              context.clear(context.COLOR_BUFFER_BIT | context.DEPTH_BUFFER_BIT);
+              context.enable(context.BLEND);
+              context.blendFunc(context.SRC_ALPHA, context.ONE_MINUS_SRC_ALPHA);
+            }
+          }
+          forceRenderFix();
+        }
+      }, 1000 * i);
+    }
+  }, 1000); // Wait 1 second after load to ensure Cocos is initialized
+});
+
+// Monitor for when cc becomes available if not already available
+if (!window.cc) {
+  const ccObserver = setInterval(() => {
+    if (window.cc) {
+      console.log('[PvZ2] Cocos engine detected, applying patches');
+      clearInterval(ccObserver);
+      
+      if (window.cc.game) {
+        const originalRun = window.cc.game.run;
+        window.cc.game.run = function() {
+          console.log('[PvZ2] Intercepting cc.game.run for WebGL fixes');
+          
+          const canvas = document.querySelector('canvas');
+          if (canvas) {
+            let context = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (context) {
+              context.clearColor(0.0, 0.0, 0.0, 0.0);
+              context.enable(context.BLEND);
+              context.blendFunc(context.SRC_ALPHA, context.ONE_MINUS_SRC_ALPHA);
+              context.clear(context.COLOR_BUFFER_BIT | context.DEPTH_BUFFER_BIT);
+            }
+          }
+          
+          // Run the original function but with a delay to allow context to be properly set up
+          setTimeout(() => {
+            originalRun.call(this);
+          }, 500);
+          
+          return undefined; // Prevent the original function from running immediately
+        };
+      }
+    }
+  }, 100);
+}
+
+// Final safety net: try to clear the canvas if it's still black
+setTimeout(() => {
+  const canvas = document.querySelector('canvas');
+  if (canvas) {
+    const context = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (context) {
+      context.clearColor(0.0, 0.0, 0.0, 0.0);
+      context.clear(context.COLOR_BUFFER_BIT | context.DEPTH_BUFFER_BIT);
+    }
+  }
+}, 3000);
+
 // Helper: Create synthetic pointer event
 function createPointerEvent(type, touch) {
   const pointerEvent = new PointerEvent(type, {

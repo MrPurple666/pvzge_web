@@ -5,6 +5,8 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.graphics.Color;
+import android.webkit.WebChromeClient;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -42,6 +44,28 @@ public class MainActivity extends BridgeActivity {
 
     // Enable hardware acceleration
     webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+
+    // Set background to transparent to fix black background issue
+    webView.setBackgroundColor(Color.TRANSPARENT);
+    
+    // Enable WebGL and advanced graphics features
+    settings.setJavaScriptEnabled(true);
+    settings.setAllowUniversalAccessFromFileURLs(true);
+    settings.setAllowFileAccessFromFileURLs(true);
+    settings.setDomStorageEnabled(true);
+    settings.setDatabaseEnabled(true);
+    settings.setLoadWithOverviewMode(true);
+    settings.setUseWideViewPort(true);
+    settings.setSupportMultipleWindows(true);
+    settings.setAllowContentAccess(true);
+    settings.setAllowFileAccess(true);
+    
+    // Additional WebGL settings
+    settings.setGeolocationEnabled(false);
+    settings.setMediaPlaybackRequiresUserGesture(false);
+    
+    // Set WebChromeClient to handle WebGL settings
+    webView.setWebChromeClient(new WebChromeClient());
 
     // Ensure touch events are not blocked
     webView.setFocusable(true);
