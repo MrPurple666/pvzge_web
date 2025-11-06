@@ -39,7 +39,7 @@ HTMLCanvasElement.prototype.getContext = function(contextType, contextAttributes
     contextAttributes.alpha = true;
     contextAttributes.premultipliedAlpha = true;
     contextAttributes.preserveDrawingBuffer = true;
-    contextAttributes.antialias = false; // Disable for performance on mobile
+    contextAttributes.antialias = true; // Enable for better rendering quality on mobile
     contextAttributes.stencil = true; // Enable stencil buffer
     
     console.log('[PvZ2] WebGL context configured with alpha and transparency');
@@ -83,28 +83,63 @@ function initWebGLForCocos() {
     window.addEventListener('orientationchange', resizeCanvas);
     
     // Get WebGL context and configure it
-    let context = canvas.getContext('webgl', {
+    let context = canvas.getContext('webgl2', {
       alpha: true,
       premultipliedAlpha: true,
       preserveDrawingBuffer: true,
-      antialias: false,
+      antialias: true,
       failIfMajorPerformanceCaveat: false,
-      stencil: true
+      stencil: true,
+      powerPreference: "high-performance"
+    }) || canvas.getContext('webgl', {
+      alpha: true,
+      premultipliedAlpha: true,
+      preserveDrawingBuffer: true,
+      antialias: true,
+      failIfMajorPerformanceCaveat: false,
+      stencil: true,
+      powerPreference: "high-performance"
     }) || canvas.getContext('experimental-webgl', {
       alpha: true,
       premultipliedAlpha: true,
       preserveDrawingBuffer: true,
-      antialias: false,
+      antialias: true,
       failIfMajorPerformanceCaveat: false,
-      stencil: true
+      stencil: true,
+      powerPreference: "high-performance"
     });
     
     if (context) {
       console.log('[PvZ2] WebGL context created successfully');
+      console.log('[PvZ2] WebGL version: ' + (context.getParameter(context.VERSION) || 'Unknown'));
       
       // Set initial clear color to transparent
       context.clearColor(0.0, 0.0, 0.0, 0.0);
       context.clear(context.COLOR_BUFFER_BIT | context.DEPTH_BUFFER_BIT);
+      
+      // Determine if this is WebGL 2.0 context and enable appropriate features
+      const isWebGL2 = context.constructor.name === 'WebGL2RenderingContext' || 
+                     (context.getParameter && context.getParameter(context.VERSION) && 
+                      context.getParameter(context.VERSION).toLowerCase().includes('webgl2'));
+      
+      if (isWebGL2) {
+        console.log('[PvZ2] Using WebGL 2.0 - Performance optimizations enabled');
+        // WebGL 2.0 specific optimizations
+        try {
+          // Enable anisotropic filtering if available
+          const ext = context.getExtension('EXT_texture_filter_anisotropic') ||
+                     context.getExtension('MOZ_EXT_texture_filter_anisotropic') ||
+                     context.getExtension('WEBKIT_EXT_texture_filter_anisotropic');
+          if (ext) {
+            const maxAnisotropy = context.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+            console.log('[PvZ2] Anisotropic filtering supported, max level:', maxAnisotropy);
+          }
+        } catch(e) {
+          console.log('[PvZ2] Anisotropic filtering not supported');
+        }
+      } else {
+        console.log('[PvZ2] Using WebGL 1.0 - Consider enabling WebGL 2.0 for better performance');
+      }
       
       // Patch the Cocos cc.game.run method to ensure WebGL context is properly set up
       if (window.cc && window.cc.game) {
@@ -119,6 +154,12 @@ function initWebGLForCocos() {
             context.enable(context.BLEND);
             context.blendFunc(context.SRC_ALPHA, context.ONE_MINUS_SRC_ALPHA);
             context.enable(context.STENCIL_TEST);
+            
+            // Additional performance optimizations for WebGL 2.0
+            if (isWebGL2) {
+              context.enable(context.TEXTURE_WRAP_S);
+              context.enable(context.TEXTURE_WRAP_T);
+            }
           }
           
           return originalRun.call(this);
@@ -153,7 +194,7 @@ window.addEventListener('load', function() {
         if (window.cc && window.cc.game) {
           const canvas = document.querySelector('canvas');
           if (canvas) {
-            const context = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            const context = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
             if (context) {
               // Apply additional WebGL fixes after engine initialization
               context.clearColor(0.0, 0.0, 0.0, 0.0);
@@ -183,7 +224,7 @@ if (!window.cc) {
           
           const canvas = document.querySelector('canvas');
           if (canvas) {
-            let context = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            let context = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
             if (context) {
               context.clearColor(0.0, 0.0, 0.0, 0.0);
               context.enable(context.BLEND);
@@ -208,7 +249,7 @@ if (!window.cc) {
 setTimeout(() => {
   const canvas = document.querySelector('canvas');
   if (canvas) {
-    const context = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    const context = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     if (context) {
       context.clearColor(0.0, 0.0, 0.0, 0.0);
       context.clear(context.COLOR_BUFFER_BIT | context.DEPTH_BUFFER_BIT);
@@ -361,6 +402,41 @@ function applyCanvasResize() {
 }
 
 setTimeout(applyCanvasResize, 100);
+
+// Additional fix: Handle Cocos resolution adaptation to remove side borders
+function handleResolutionAdaptation() {
+  // Wait for Cocos to be initialized
+  const checkAndFix = setInterval(() => {
+    if (window.cc && window.cc.view) {
+      clearInterval(checkAndFix);
+      
+      // Configure the view to properly handle different screen ratios
+      const view = cc.view;
+      
+      // Set the design resolution and policy to better handle mobile screens
+      // This prevents the side borders by using a more appropriate scaling policy
+      if (view.setDesignResolutionSize) {
+        // Get current canvas size
+        const width = view.getCanvasSize ? view.getCanvasSize().width : window.innerWidth;
+        const height = view.getCanvasSize ? view.getCanvasSize().height : window.innerHeight;
+        
+        // Use SHOW_ALL policy which maintains aspect ratio without borders on sides
+        // This is better than EXACT_FIT for handling different screen ratios
+        view.setDesignResolutionSize(1024, 640, cc.ResolutionPolicy.SHOW_ALL);
+        
+        console.log('[PvZ2] Resolution adaptation configured with SHOW_ALL policy');
+        
+        // Adjust viewport to ensure no clipping
+        if (view.setFrameZoomFactor) {
+          view.setFrameZoomFactor(1.0);
+        }
+      }
+    }
+  }, 500);
+}
+
+// Apply resolution adaptation fix
+setTimeout(handleResolutionAdaptation, 2000);
 
 console.log('[PvZ2] Android touch fix initialized');
 

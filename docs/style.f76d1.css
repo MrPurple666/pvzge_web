@@ -51,6 +51,18 @@ canvas {
 #GameDiv, #Cocos3dGameContainer, #GameCanvas {
   width: 100%;
   height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  /* Remove any potential borders or outlines that might cause visual artifacts */
+  border: none;
+  outline: none;
+  box-sizing: border-box;
+  /* Prevent scaling artifacts */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  -webkit-font-smoothing: antialiased;
 }
 
 :root {

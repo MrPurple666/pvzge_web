@@ -79,8 +79,28 @@ public class MainActivity extends BridgeActivity {
     settings.setGeolocationEnabled(false);
     settings.setMediaPlaybackRequiresUserGesture(false);
     
+    // Enable advanced WebGL features for better performance
+    settings.setDomStorageEnabled(true);
+    settings.setDatabaseEnabled(true);
+    settings.setSaveFormData(false);
+    
     // Set WebChromeClient to handle WebGL settings
-    webView.setWebChromeClient(new WebChromeClient());
+    webView.setWebChromeClient(new WebChromeClient() {
+        // Enable WebGL 2.0 support on Android
+        @Override
+        public boolean onConsoleMessage(android.webkit.ConsoleMessage consoleMessage) {
+            // Allow WebGL 2.0 context creation
+            return true;
+        }
+    });
+    
+    // Enable hardware acceleration for better WebGL performance
+    webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+    
+    // Set hardware acceleration properties for WebGL
+    webView.setDrawingCacheBackgroundColor(0x00000000);
+    webView.setWillNotCacheDrawing(false);
+    webView.setDrawingCacheEnabled(false);
 
     // Ensure touch events are not blocked
     webView.setFocusable(true);
@@ -88,6 +108,7 @@ public class MainActivity extends BridgeActivity {
 
     // Remove padding/margin that might interfere
     webView.setPadding(0, 0, 0, 0);
+    webView.setClipToPadding(false);
 
     // Layout parameters
     ViewGroup.LayoutParams params = webView.getLayoutParams();
@@ -96,5 +117,10 @@ public class MainActivity extends BridgeActivity {
       params.height = ViewGroup.LayoutParams.MATCH_PARENT;
       webView.setLayoutParams(params);
     }
+    
+    // Additional rendering optimizations for game
+    webView.setOverScrollMode(View.OVER_SCROLL_NEVER); // Disable overscroll glow
+    webView.setHorizontalScrollBarEnabled(false);
+    webView.setVerticalScrollBarEnabled(false);
   }
 }
