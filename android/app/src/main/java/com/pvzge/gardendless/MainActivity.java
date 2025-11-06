@@ -5,6 +5,8 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.graphics.Color;
 import android.webkit.WebChromeClient;
 import com.getcapacitor.BridgeActivity;
@@ -14,6 +16,19 @@ public class MainActivity extends BridgeActivity {
   @Override
   public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
+
+    // Hide status bar and navigation bar for fullscreen gaming experience
+    getWindow().getDecorView().setSystemUiVisibility(
+        View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+        | View.SYSTEM_UI_FLAG_FULLSCREEN
+        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+    );
+    
+    // Keep screen on during gameplay
+    getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
     // Get WebView reference
     WebView webView = bridge.getWebView();
